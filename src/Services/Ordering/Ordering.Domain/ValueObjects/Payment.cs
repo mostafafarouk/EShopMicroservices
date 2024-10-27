@@ -8,7 +8,7 @@ namespace Ordering.Domain.ValueObjects
         public string CardNumber { get; } = default!;
         public string Expiration { get; } = default!;
         public string CVV { get; } = default!;
-        public int PaymentMethod { get; } = default!;
+        public string PaymentMethod { get; } = default!;
         public string PaymentMethod1 { get; }
 
         protected Payment()
