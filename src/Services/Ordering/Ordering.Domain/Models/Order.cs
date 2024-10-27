@@ -15,24 +15,24 @@ namespace Ordering.Domain.Models
         public Address BillingAddress { get; set; }
         public Payment Payment { get; set; }
         public OrderStatus Status { get; set; }
-        public decimal TotalPrive
+        public decimal TotalPride
         {
             get => OrderItems.Sum(x => x.Price * x.Quantity);
             private set { }
         }
 
         public static Order Create(OrderId id,
-            IReadOnlyList<OrderItem> orderItems,
             CustomerId customerId,
             OrderName orderName,
             Address shippingAddress,
+            Address billingAddress,
             Payment payment)
         {
             var order = new Order
             {
                 Id = id,
                 CustomerId = customerId,
-                BillingAddress = shippingAddress,
+                BillingAddress = billingAddress,
                 OrderName = orderName,
                 ShippingAddress = shippingAddress,
                 Payment = payment,
@@ -42,26 +42,15 @@ namespace Ordering.Domain.Models
             return order;
         }
 
-        public static Order Update(OrderId id,
-           IReadOnlyList<OrderItem> orderItems,
-           CustomerId customerId,
-           OrderName orderName,
-           Address shippingAddress,
-           Payment payment,
-           OrderStatus status)
+        public void Update(OrderName orderName, Address shippingAddress, Address billingAddress, Payment payment, OrderStatus status)
         {
-            var order = new Order
-            {
-                Id = id,
-                CustomerId = customerId,
-                BillingAddress = shippingAddress,
-                OrderName = orderName,
-                ShippingAddress = shippingAddress,
-                Payment = payment,
-                Status = status
-            };
-            order.AddDomainEvent(new OrderUpdatedEvent(this));
-            return order;
+            OrderName = orderName;
+            ShippingAddress = shippingAddress;
+            BillingAddress = billingAddress;
+            Payment = payment;
+            Status = status;
+
+            AddDomainEvent(new OrderUpdatedEvent(this));
         }
         public void Add(ProductId productId,int quantity,decimal price)
         {

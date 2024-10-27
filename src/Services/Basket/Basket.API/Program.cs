@@ -1,19 +1,25 @@
 using BuildingBlocks.Behaviors;
+using BuildingBlocks.Exceptions.Handler;
+using Discount.Grpc;
 using Discount.Grpc.Protos;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
-//Add services to the container
-var assembly = typeof(Program).Assembly;
 
+// Add services to the container.
+
+//Application Services
+var assembly = typeof(Program).Assembly;
 builder.Services.AddCarter();
 builder.Services.AddMediatR(config =>
 {
-    config.RegisterServicesFromAssemblies(assembly);
+    config.RegisterServicesFromAssembly(assembly);
     config.AddOpenBehavior(typeof(ValidationBehavior<,>));
     config.AddOpenBehavior(typeof(LoggingBehavior<,>));
 });
+
+//Data Services
 builder.Services.AddMarten(opts =>
 {
     opts.Connection(builder.Configuration.GetConnectionString("Database")!);
@@ -21,16 +27,18 @@ builder.Services.AddMarten(opts =>
 }).UseLightweightSessions();
 
 builder.Services.AddScoped<IBasketRepository, BasketRepository>();
-builder.Services.Decorate<IBasketRepository, BasketRepository>();
+builder.Services.Decorate<IBasketRepository, CacheBasketRepository>();
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    //options.InstanceName = "Basket";
 });
 
-builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(opt =>
+//Grpc Services
+builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(options =>
 {
-    opt.Address = new Uri(builder.Configuration["GrpcSettings.DiscountUrl"]!);
+    options.Address = new Uri(builder.Configuration["GrpcSettings:DiscountUrl"]!);
 })
 .ConfigurePrimaryHttpMessageHandler(() =>
 {
@@ -39,17 +47,26 @@ builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(
         ServerCertificateCustomValidationCallback =
         HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
     };
-return handler;
+
+    return handler;
 });
+
+//Cross-Cutting Services
+builder.Services.AddExceptionHandler<CustomExceptionHandler>();
+
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Database")!)
     .AddRedis(builder.Configuration.GetConnectionString("Redis")!);
+
 var app = builder.Build();
-//Configure the http pipeline
+
+// Configure the HTTP request pipeline.
 app.MapCarter();
+app.UseExceptionHandler(options => { });
 app.UseHealthChecks("/health",
     new HealthCheckOptions
     {
-        ResponseWriter=UIResponseWriter.WriteHealthCheckUIResponse
+        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
+
 app.Run();
